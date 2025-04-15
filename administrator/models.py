@@ -25,8 +25,7 @@ class User(AbstractUser):
     )
     is_driver = models.BooleanField(default=False)
     is_client = models.BooleanField(default=False)
-    can_request = models.BooleanField(default=False)
-    can_post = models.BooleanField(default=False)
+    is_available = models.BooleanField(default=False)
     profile_picture = models.ImageField(upload_to='profile_picture/', null=True, blank=True)
     
     def save(self, *args, **kwargs):
@@ -89,11 +88,11 @@ class UserVerification(models.Model):
     
     
 
-class IdentityInf0(models.Model):
+class IdentityInfo(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    selfie = models.ImageField()
-    driver_licenses = models.ImageField()
-    ID = models.CharField(max_length=16)
+    selfie = models.ImageField(null=True, blank=True)
+    driver_licenses = models.ImageField(null=True, blank=True)
+    ID_no = models.CharField(max_length=16, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_verified = models.BooleanField(default=False)
     
@@ -105,4 +104,13 @@ class IdentityInf0(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.user.first_name}"
+        return f"{self.user.first_name} identity info"
+    
+    
+    
+class Wallet(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    balance = models.DecimalField(decimal_places=2, max_digits=8)
+    
+    def __str__(self):
+        return f"{self.user.first_name} - wallet balance {self.balance}"

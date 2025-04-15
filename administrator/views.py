@@ -156,6 +156,7 @@ class PaystackDriverConfirmSubscriptionView(APIView):
             Transaction.objects.create(
                 user = user,
                 ref= reference,
+                tran_type = "sub",
                 amount = Decimal(metadata["subscription_price"]),
                 description = f"payment of {metadata["subscription_plan"]} subscription registration",
                 date = timezone.now()
