@@ -110,7 +110,7 @@ class IdentityInfo(models.Model):
     
 class Wallet(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    balance = models.DecimalField(decimal_places=2, max_digits=8)
+    balance = models.DecimalField(decimal_places=2, max_digits=80)
     
     def __str__(self):
         return f"{self.user.first_name} - wallet balance {self.balance}"

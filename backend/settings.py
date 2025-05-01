@@ -225,73 +225,73 @@ DRF_STANDARDIZED_ERRORS = {
 }
 
 
-ADMINS = [
-    ("Lucky", "luckystarboy01@gmail.com"),
-]
+# ADMINS = [
+#     ("Lucky", "luckystarboy01@gmail.com"),
+# ]
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "filters": {
-        "require_debug_false": {
-            "()": "django.utils.log.RequireDebugFalse",
-        },
-        "require_debug_true": {
-            "()": "django.utils.log.RequireDebugTrue",
-        },
-    },
-    "handlers": {
-        "console": {
-            "level": "DEBUG",
-            "class": "logging.StreamHandler",
-            "formatter": "verbose",
-        },
-        "file": {
-            "level": "DEBUG",
-            "class": "logging.FileHandler",
-            "filename": "debug.log",
-            "formatter": "verbose",
-        },
-        "error_file": {
-            "level": "ERROR",
-            "class": "logging.FileHandler",
-            "filename": "errors.log",
-            "formatter": "verbose",
-        },
-        "mail_admins": {
-            "level": "ERROR",
-            "class": "django.utils.log.AdminEmailHandler",
-            "filters": ["require_debug_false"],
-            "email_backend": "django.core.mail.backends.smtp.EmailBackend",
-            "include_html": True,
-        },
-    },
-    "formatters": {
-        "verbose": {
-            "format": "[%(asctime)s] [%(levelname)s] [%(name)s:%(lineno)d] - %(message)s",
-            "datefmt": "%Y-%m-%d %H:%M:%S",
-        },
-        "standard": {
-            "format": "[%(asctime)s] [%(levelname)s] %(module)s - %(message)s",
-            "datefmt": "%Y-%m-%d %H:%M:%S",
-        },
-        "json": {  # JSON formatter (optional for structured logging)
-            "format": '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "module": "%(module)s", "line": %(lineno)d, "message": "%(message)s"}',
-            "datefmt": "%Y-%m-%dT%H:%M:%S",
-        },
-    },
-    "loggers": {
-        "django": {
-            "handlers": ["file", "mail_admins"],
-            "level": "INFO",
-            "propagate": True,
-        },
-        "django.request": {
-            "handlers": ["console", "error_file"],
-            "level": "ERROR",
-            "propagate": False,
-        },
-    },
-}
+# LOGGING = {
+#     "version": 1,
+#     "disable_existing_loggers": False,
+#     "filters": {
+#         "require_debug_false": {
+#             "()": "django.utils.log.RequireDebugFalse",
+#         },
+#         "require_debug_true": {
+#             "()": "django.utils.log.RequireDebugTrue",
+#         },
+#     },
+#     "handlers": {
+#         "console": {
+#             "level": "DEBUG",
+#             "class": "logging.StreamHandler",
+#             "formatter": "verbose",
+#         },
+#         "file": {
+#             "level": "DEBUG",
+#             "class": "logging.FileHandler",
+#             "filename": "debug.log",
+#             "formatter": "verbose",
+#         },
+#         "error_file": {
+#             "level": "ERROR",
+#             "class": "logging.FileHandler",
+#             "filename": "errors.log",
+#             "formatter": "verbose",
+#         },
+#         "mail_admins": {
+#             "level": "ERROR",
+#             "class": "django.utils.log.AdminEmailHandler",
+#             "filters": ["require_debug_false"],
+#             "email_backend": "django.core.mail.backends.smtp.EmailBackend",
+#             "include_html": True,
+#         },
+#     },
+#     "formatters": {
+#         "verbose": {
+#             "format": "[%(asctime)s] [%(levelname)s] [%(name)s:%(lineno)d] - %(message)s",
+#             "datefmt": "%Y-%m-%d %H:%M:%S",
+#         },
+#         "standard": {
+#             "format": "[%(asctime)s] [%(levelname)s] %(module)s - %(message)s",
+#             "datefmt": "%Y-%m-%d %H:%M:%S",
+#         },
+#         "json": {  # JSON formatter (optional for structured logging)
+#             "format": '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "module": "%(module)s", "line": %(lineno)d, "message": "%(message)s"}',
+#             "datefmt": "%Y-%m-%dT%H:%M:%S",
+#         },
+#     },
+#     "loggers": {
+#         "django": {
+#             "handlers": ["file", "mail_admins"],
+#             "level": "INFO",
+#             "propagate": True,
+#         },
+#         "django.request": {
+#             "handlers": ["console", "error_file"],
+#             "level": "ERROR",
+#             "propagate": False,
+#         },
+#     },
+# }
 
 PAYSTACK_SECRET_KEY=os.getenv('PAYSTACK_SECRET_KEY')

@@ -11,9 +11,9 @@ class Ride(models.Model):
     destination = models.CharField(max_length=150)
     date_of_departure = models.DateTimeField(default=timezone.now)
     available_seat = models.PositiveIntegerField(null=True, blank=True)
-    price_per_seat = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
-    total_price = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
-    to_bal_price = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
+    price_per_seat = models.DecimalField(max_digits=80, decimal_places=2, default=0.00)
+    total_price = models.DecimalField(max_digits=80, decimal_places=2, default=0.00)
+    to_bal_price = models.DecimalField(max_digits=80, decimal_places=2, default=0.00)
 
     def save(self, *args, **kwargs):
         vehicle_info = getattr(self, 'vehicleinfo', None)
@@ -48,6 +48,18 @@ class RidePassenger(models.Model):
     seat_taken = models.PositiveIntegerField(null=True, blank=True)
     has_paid = models.BooleanField(default=False)
     is_completed = models.BooleanField(default=False)
+    class Status(models.TextChoices):
+        PENDING   = "pending",   "Pending"
+        ONGOING   = "ongoing",   "Ongoing"
+        COMPLETED = "completed", "Completed"
+        REJECTED  = "rejected",  "Rejected"
+
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.PENDING,
+        help_text="Current passenger status"
+    )
     class PaymentMethod(models.TextChoices):
         ONLINE = "online", "online"
         ARRIVAL = "pay on arrival", "pay on arrival"
@@ -63,11 +75,12 @@ class RidePassenger(models.Model):
     
     @staticmethod
     def get_passenger_status_summary(driver):
-        pending = RidePassenger.objects.filter(ride__user=driver, is_completed=False).count()
-        completed = RidePassenger.objects.filter(ride__user=driver, is_completed=True).count()
+        qs = RidePassenger.objects.filter(ride__user=driver)
         return {
-            "pending": pending,
-            "completed": completed
+            "pending":   qs.filter(status=RidePassenger.Status.PENDING).count(),
+            "ongoing":   qs.filter(status=RidePassenger.Status.ONGOING).count(),
+            "completed": qs.filter(status=RidePassenger.Status.COMPLETED).count(),
+            "rejected":  qs.filter(status=RidePassenger.Status.REJECTED).count(),
         }
     
 
@@ -146,7 +159,7 @@ class DriverReview(models.Model):
         ordering = ['-date_created']
 
     def __str__(self):
-        return f"⭐️ {self.rating} - {self.comment[:30]}... for {self.driver.username}"
+        return f"⭐️ {self.rating} - {self.comment[:30]}... for {self.driver.first_name}"
     
     @staticmethod
     def get_average_rating(user):

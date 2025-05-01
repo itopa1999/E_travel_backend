@@ -1,0 +1,319 @@
+using System.Net;
+using GateForce.Guardian.Commands;
+using GateForce.Guardian.Models.Dto;
+using GateForce.Guardian.Queries;
+using GateForce.Shared.Infrastructure.Helpers;
+using MediatR;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace GateForce.Guardian.Controllers.MerchantPortal
+{
+    [Route("api/v3/guardian/merchant-portal/guarantor")]
+    [ApiController]
+    public class GuarantorController : ControllerBase
+    {
+        private readonly IMediator _mediator;
+
+        public GuarantorController(IMediator mediator)
+        {
+            _mediator = mediator;
+        }
+
+        [HttpPost("add")]
+        [Authorize]
+        [ProducesResponseType(typeof(string), (int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(ErrorResponse), (int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), (int)HttpStatusCode.InternalServerError)]
+        public async Task<IActionResult> AddGuarantor([FromQuery] int loanApplicationId, [FromBody] AddGuarantorDto request, CancellationToken cancellationToken)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ErrorResponse.GetModelStateErrors(ModelState.Values));
+
+            var command = new AddGuarantor.Command
+            {
+                LoanApplicationId = loanApplicationId,
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                PhoneNumber = request.PhoneNumber,
+                Email = request.Email
+            };
+
+            var result = await _mediator.Send(command, cancellationToken);
+
+            return StatusCode((int)result.StatusCode, result);
+        }
+
+        [HttpPost("loan-details")]
+        [Authorize]
+        [ProducesResponseType(typeof(LoanDetailsForGuarantorDto), (int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(ErrorResponse), (int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), (int)HttpStatusCode.InternalServerError)]
+        public async Task<IActionResult> GetLoanDetails([FromQuery] string name, [FromQuery] string username)
+        {
+            var query = new GetLoanDetailsForGuarantor.Query
+            {
+                Name = name,
+                Username = username
+            };
+            
+            var result = await _mediator.Send(query);
+
+            return StatusCode((int)result.StatusCode, result);
+        }
+
+    }
+}
+
+
+
+
+
+
+using System.Net;
+using GateForce.Guardian.Models.Dto;
+using GateForce.Guardian.Persistence;
+using GateForce.Shared.Infrastructure.BaseClasses;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+
+namespace GateForce.Guardian.Queries;
+public class GetLoanDetailsForGuarantor
+{
+    public class Query : IRequest<BaseResult<LoanDetailsForGuarantorDto>>
+    {
+        public string Name { get; set; }
+        public string Username { get; set; }
+    }
+
+    public class GetLoanDetailsForGuarantorHandler : IRequestHandler<Query, BaseResult<LoanDetailsForGuarantorDto>>
+    {
+        private readonly GuardianReadWriteDbContext _context;
+
+        public GetLoanDetailsForGuarantorHandler(GuardianReadWriteDbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<BaseResult<LoanDetailsForGuarantorDto>> Handle(Query request, CancellationToken cancellationToken)
+        {
+            var loanApplication = await _context.LoanApplications
+                .FirstOrDefaultAsync(x => x.Username == request.Username && !x.IsDeleted, cancellationToken);
+
+            if (loanApplication == null)
+            {
+                return new BaseResult<LoanDetailsForGuarantorDto>(HttpStatusCode.BadRequest, "Loan application not found");
+            }
+
+            var nameParts = request.Name.Split('_', StringSplitOptions.RemoveEmptyEntries);
+            if (nameParts.Length != 2)
+            {
+                return new BaseResult<LoanDetailsForGuarantorDto>(HttpStatusCode.BadRequest, "Invalid name format. Use 'firstname_lastname'");
+            }
+
+            var firstName = nameParts[0].Trim().ToLower();
+            var lastName = nameParts[1].Trim().ToLower();
+
+            var guarantor = await _context.Guarantors
+                .FirstOrDefaultAsync(g =>
+                    g.LoanApplicationId == loanApplication.Id &&
+                    g.FirstName!.ToLower() == firstName &&
+                    g.LastName!.ToLower() == lastName && 
+                    !g.IsDeleted,
+                    cancellationToken);
+
+            if (guarantor == null)
+            {
+                return new BaseResult<LoanDetailsForGuarantorDto>(HttpStatusCode.BadRequest, $"Guarantor {firstName}_{lastName} does not exist.");
+            }
+
+            var dto = new LoanDetailsForGuarantorDto
+            {
+                GuarantorId = guarantor.Id,
+                GuarantorName = $"{guarantor.FirstName} {guarantor.LastName}",
+                LoanApplicationId = loanApplication.Id,
+                ApplicantUsername = loanApplication.Username,
+                LoanAmount = loanApplication.LoanAmount
+            };
+
+            return new BaseResult<LoanDetailsForGuarantorDto>
+            {
+                StatusCode = HttpStatusCode.OK,
+                Message = "Loan details retrieved successfully",
+                Data = dto
+            };
+        }
+    }
+}
+
+
+
+
+
+
+using System.Net;
+using GateForce.Guardian.Entities;
+using GateForce.Guardian.Enums;
+using GateForce.Guardian.Persistence;
+using GateForce.Guardian.Queries;
+using GateForce.Lector.Tests.UnitTests;
+using static GateForce.Shared.Infrastructure.Helpers.ConstantValueHelper;
+
+namespace Gateforce.Guardian.Tests.UnitTests.GuarantorTests;
+public class GetLoanDetailsForGuarantorTests : InMemoryDbContextFactory<GuardianReadWriteDbContext>
+{
+    
+    [Fact]
+    public async Task Should_Return_BadRequest_When_LoanApplication_Does_Not_Exist()
+    {
+        // Arrange
+        var query = new GetLoanDetailsForGuarantor.Query
+        {
+            Name = "John_Luck",
+            Username = "AgentUsername"
+        };
+
+        var handler = new GetLoanDetailsForGuarantor.GetLoanDetailsForGuarantorHandler(DbContext);
+
+        // Act
+        var result = await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, result.StatusCode);
+        Assert.Equal("Loan application not found", result.Message);
+    }
+
+
+    [Fact]
+    public async Task Should_Return_BadRequest_When_Name_Format_Is_Invalid()
+    {
+        // Arrange
+        var loanApplication = new LoanApplication
+        {
+            Id = 1,
+            Username = "AgentUsername",
+            AgentId = 123,
+            LoanAmount = 10000,
+            LoanPurpose = "Stock Purchase",
+            LoanTenure = "6 months",
+            ApplicationStatus = "Pending",
+            LoanType = LoanType.MerchantLending,
+            LoanChannel = LoanChannel.Offline,
+        };
+        await DbContext.LoanApplications.AddAsync(loanApplication);
+        await DbContext.SaveChangesAsync();
+
+        var query = new GetLoanDetailsForGuarantor.Query
+        {
+            Name = "InvalidNameFormat", // No underscore, so return BadRequest
+            Username = "AgentUsername"
+        };
+
+        var handler = new GetLoanDetailsForGuarantor.GetLoanDetailsForGuarantorHandler(DbContext);
+
+        // Act
+        var result = await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, result.StatusCode);
+        Assert.Equal("Invalid name format. Use 'firstname_lastname'", result.Message);
+    }
+
+
+    [Fact]
+    public async Task Should_Return_BadRequest_When_Guarantor_Data_Is_Invalid()
+    {
+        // Arrange
+        var loanApplication = new LoanApplication
+        {
+            Id = 1,
+            Username = "AgentUsername",
+            AgentId = 123,
+            LoanAmount = 10000,
+            LoanPurpose = "Stock Purchase",
+            LoanTenure = "6 months",
+            ApplicationStatus = "Pending",
+            LoanType = LoanType.MerchantLending,
+            LoanChannel = LoanChannel.Offline,
+        };
+        DbContext.LoanApplications.Add(loanApplication);
+        await DbContext.SaveChangesAsync();
+
+        var guarantor = new Guarantor
+        {
+            LoanApplicationId = 1,
+            FirstName = "John",
+            LastName = "Luck",
+            PhoneNumber = "08012345678",
+            Email = "john.doe@example.com"
+        };
+        await DbContext.Guarantors.AddAsync(guarantor);
+        await DbContext.SaveChangesAsync();
+
+        var query = new GetLoanDetailsForGuarantor.Query
+        {
+            Name = "John_Empty", // username not tally with the guarantor full name
+            Username = "AgentUsername"
+        };
+
+        var handler = new GetLoanDetailsForGuarantor.GetLoanDetailsForGuarantorHandler(DbContext);
+
+        // Act
+        var result = await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, result.StatusCode);
+        Assert.Equal($"Guarantor {query.Name.ToLower()} does not exist.", result.Message);
+    }
+
+
+    [Fact]
+    public async Task Should_Return_Data_When_Guarantor_And_LoanApplication_Exists()
+    {
+        // Arrange
+        var loanApplication = new LoanApplication
+        {
+            Id = 1,
+            Username = "AgentUsername",
+            AgentId = 123,
+            LoanAmount = 10000,
+            LoanPurpose = "Stock Purchase",
+            LoanTenure = "6 months",
+            ApplicationStatus = "Pending",
+            LoanType = LoanType.MerchantLending,
+            LoanChannel = LoanChannel.Offline,
+        };
+        await DbContext.LoanApplications.AddAsync(loanApplication);
+
+        var guarantor = new Guarantor
+        {
+            LoanApplicationId = 1,
+            FirstName = "John",
+            LastName = "Luck",
+            PhoneNumber = "08012345678",
+            Email = "john.luck@example.com"
+        };
+        await DbContext.Guarantors.AddAsync(guarantor);
+        await DbContext.SaveChangesAsync();
+
+        var query = new GetLoanDetailsForGuarantor.Query
+        {
+            Name = "John_Luck",
+            Username = "AgentUsername"
+        };
+
+        var handler = new GetLoanDetailsForGuarantor.GetLoanDetailsForGuarantorHandler(DbContext);
+
+        // Act
+        var result = await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, result.StatusCode);
+        Assert.NotNull(result.Data);
+        Assert.Equal("John Luck", result.Data.GuarantorName);
+        Assert.Equal(1, result.Data.LoanApplicationId);
+        Assert.Equal("AgentUsername", result.Data.ApplicantUsername);
+        Assert.Equal(10000, result.Data.LoanAmount);
+    }
+}
+

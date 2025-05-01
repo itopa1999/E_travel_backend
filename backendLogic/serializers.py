@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ParseError
 
 from administrator.models import IdentityInfo
-from backendLogic.models import DriverReview, Ride, RidePassenger, VehicleInfo
+from backendLogic.models import DriverReview, Ride, RidePassenger, Transaction, VehicleInfo
 
 
 class DashboardRatingListSerializer(serializers.ModelSerializer):
@@ -42,7 +42,6 @@ class IdVerificationSerializer(serializers.Serializer):
     departure = serializers.CharField()
     destination = serializers.CharField()
     date_of_departure = serializers.DateTimeField()
-    available_seat = serializers.IntegerField()
     seating_capacity = serializers.IntegerField()
     price_per_seat = serializers.DecimalField(max_digits=10, decimal_places=2)
     plate_no = serializers.CharField()
@@ -58,6 +57,8 @@ class IdVerificationSerializer(serializers.Serializer):
     def create(self, validated_data):
         request = self.context['request']
         user = request.user
+        
+        print(validated_data)
 
         # Extract identity data
         selfie = validated_data.pop('selfie')
@@ -68,7 +69,6 @@ class IdVerificationSerializer(serializers.Serializer):
         departure = validated_data.pop('departure')
         destination = validated_data.pop('destination')
         date_of_departure = validated_data.pop('date_of_departure')
-        available_seat = validated_data.pop('available_seat')
         price_per_seat = validated_data.pop('price_per_seat')
 
         # Extract vehicle data
@@ -104,10 +104,7 @@ class IdVerificationSerializer(serializers.Serializer):
             destination=destination,
             date_of_departure=date_of_departure,
             defaults={
-                'available_seat': available_seat,
                 'price_per_seat': price_per_seat,
-                'total_price': price_per_seat * available_seat,
-                'to_bal_price': price_per_seat * available_seat
             }
         )
         
@@ -116,10 +113,7 @@ class IdVerificationSerializer(serializers.Serializer):
             ride.departure = departure
             ride.destination = destination
             ride.date_of_departure = date_of_departure
-            ride.available_seat = available_seat
             ride.price_per_seat = price_per_seat
-            ride.total_price = price_per_seat * available_seat
-            ride.to_bal_price = price_per_seat * available_seat
             ride.save()
 
         # Get or create VehicleInfo
@@ -148,3 +142,70 @@ class IdVerificationSerializer(serializers.Serializer):
             'ride': ride.id,
             'vehicle': vehicle.id
         }
+        
+        
+        
+class IdentityInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IdentityInfo
+        fields = ['id', 'ID_no', 'selfie', 'driver_licenses', 'is_verified']
+        
+    def get_selfie(self, obj):
+        request = self.context.get('request')
+        if obj.selfie and request:
+            return request.build_absolute_uri(obj.selfie.url)
+        return None
+
+    def get_driver_licenses(self, obj):
+        request = self.context.get('request')
+        if obj.driver_licenses and request:
+            return request.build_absolute_uri(obj.driver_licenses.url)
+        return None
+
+class RideSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Ride
+        fields = ['id', 'departure', 'destination', 'date_of_departure', 'price_per_seat']
+
+class VehicleInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VehicleInfo
+        fields = ['id', 'vehicle_name', 'vehicle_type', 'seating_capacity', 'plate_no', 'vehicle_color', 'ride']
+        
+        
+
+class RidePassengerDetailsSerializer(serializers.ModelSerializer):
+    is_actionable = serializers.SerializerMethodField()
+    first_name = serializers.CharField(source="user.first_name")
+    last_name = serializers.CharField(source="user.last_name")
+    profile_picture = serializers.SerializerMethodField()
+    phone = serializers.CharField(source="user.phone", default=None)
+    email = serializers.EmailField(source="user.email")
+
+    class Meta:
+        model = RidePassenger
+        fields = [
+            "id","first_name", "last_name", "phone", "email",
+            "special_request", "seat_taken", "has_paid", "profile_picture",
+            "is_completed", "payment_method", "status",
+            "is_actionable",
+        ]
+        
+    def get_is_actionable(self, obj):
+        return obj.status in (
+            RidePassenger.Status.PENDING,
+            RidePassenger.Status.ONGOING
+        )
+        
+    def get_profile_picture(self, obj):
+        request = self.context.get("request")
+        profile_pic = obj.user.profile_picture
+        if profile_pic and hasattr(profile_pic, "url"):
+            return request.build_absolute_uri(profile_pic.url)
+        return None
+        
+        
+class TransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Transaction
+        fields = ['id', 'amount', 'description', 'tran_type', 'ref', 'date']

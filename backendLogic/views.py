@@ -13,9 +13,10 @@ from rest_framework import status, generics
 from rest_framework.parsers import MultiPartParser, FormParser
 
 
+from administrator.models import IdentityInfo
 from backend.permissions import IsClientPermission, IsDriverPermission
-from backendLogic.serializers import DashboardActiveRideListSerializer, DashboardRatingListSerializer, IdVerificationSerializer, WithdrawalSerializer
-from .models import DriverReview, RidePassenger, Transaction
+from backendLogic.serializers import DashboardActiveRideListSerializer, DashboardRatingListSerializer, IdVerificationSerializer, IdentityInfoSerializer, RidePassengerDetailsSerializer, RideSerializer, TransactionSerializer, VehicleInfoSerializer, WithdrawalSerializer
+from .models import DriverReview, Ride, RidePassenger, Transaction, VehicleInfo
 
 
 
@@ -29,7 +30,10 @@ class DashboardView(APIView):
         ride_summary = RidePassenger.get_passenger_status_summary(user)
         avg_rating = DriverReview.get_average_rating(user)
         
-        active_rides = RidePassenger.objects.filter(ride__user = user, is_completed=False)[:5]
+        active_rides = RidePassenger.objects.filter(
+            ride__user=user,
+            status__in=[RidePassenger.Status.PENDING, RidePassenger.Status.ONGOING]
+        )[:5]        
         serialize_active_rides = DashboardActiveRideListSerializer(active_rides, many = True).data
         
         ratings = DriverReview.objects.filter(driver = user)[:5]
@@ -122,7 +126,7 @@ class WithdrawalProcessView(generics.GenericAPIView):
 class IdVerificationView(generics.GenericAPIView):
     serializer_class = IdVerificationSerializer
     permission_classes = [IsAuthenticated, IsDriverPermission]
-    parser_classes = [MultiPartParser, FormParser]  # Add this line
+    parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={'request': request})
@@ -145,6 +149,109 @@ class IdVerificationView(generics.GenericAPIView):
             fail_silently=False,
         )
             
-            return Response({'detail': 'ID verification submitted successfully.', 'data': result})
+            return Response({'error': 'ID verification submitted successfully.', 'data': result})
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    
+    
+    
+class GetAllUserInfoView(APIView):
+    permission_classes = [IsAuthenticated, IsDriverPermission]
+
+    def get(self, request):
+        user = request.user
+        data = {}
+
+        # Identity Info
+        try:
+            identity = IdentityInfo.objects.get(user=user)
+            data['identity'] = IdentityInfoSerializer(identity, context={'request': request}).data
+        except IdentityInfo.DoesNotExist:
+            data['identity'] = None
+
+        # Ride Info
+        try:
+            ride = Ride.objects.get(user=user)
+            data['ride'] = RideSerializer(ride).data
+        except Ride.DoesNotExist:
+            data['ride'] = None
+
+        # Vehicle Info (only if ride exists)
+        if data['ride']:
+            try:
+                vehicle = VehicleInfo.objects.get(ride=ride)
+                data['vehicle'] = VehicleInfoSerializer(vehicle).data
+            except VehicleInfo.DoesNotExist:
+                data['vehicle'] = None
+        else:
+            data['vehicle'] = None
+
+        return Response(data)
+    
+    
+    
+class RidePassengerDetailAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsDriverPermission]
+    def get(self, request, request_ride_id, *args, **kwargs):
+
+        try:
+            ride = RidePassenger.objects.get(id =request_ride_id, ride__user = request.user)
+        except RidePassenger.DoesNotExist:
+            return Response({"error": "No ride details found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = RidePassengerDetailsSerializer(ride, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        
+    def patch(self, request, request_ride_id, *args, **kwargs):
+        try:
+            passenger = RidePassenger.objects.get(
+                id=request_ride_id,
+                ride__user=request.user
+            )
+        except RidePassenger.DoesNotExist:
+            return Response(
+                {"error": "No ride details found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # If not actionable, reject
+        if not passenger.status in (
+            RidePassenger.Status.PENDING,
+            RidePassenger.Status.ONGOING
+        ):
+            return Response(
+                {"detail": "Cannot change status once finalized."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Read new status from request body
+        new_status = request.data.get("status")
+        if new_status not in RidePassenger.Status.values:
+            return Response(
+                {"detail": f"Invalid status '{new_status}'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        passenger.status = new_status
+        passenger.save()
+
+        serializer = RidePassengerDetailsSerializer(passenger, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    
+class DriverEarningSummaryAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsDriverPermission]
+    def get(self, request, *args, **kwargs):
+        user = self.request.user
+        summary = Transaction.get_earnings(user)
+        
+        trans_history = Transaction.objects.filter(user=user).order_by('-date')
+        trans_serializer = TransactionSerializer(trans_history, many=True)
+
+        response = {
+            "trans_summary": summary,
+            "trans_history": trans_serializer.data,
+            "wallet_balance" : user.wallet.balance,
+        }
+        return Response(response, status=status.HTTP_200_OK)

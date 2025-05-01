@@ -20,7 +20,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
-
+from rest_framework.permissions import AllowAny
 
 
 from backendLogic.models import Subscription, Transaction
@@ -336,6 +336,8 @@ class ResendVerificationTokenView(generics.GenericAPIView):
 class LoginView(generics.GenericAPIView):
     serializer_class = UserLoginSerializer
     swagger_schema = TaggedAutoSchema
+    authentication_classes = []
+    permission_classes = [AllowAny]
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
