@@ -82,6 +82,27 @@ class RidePassenger(models.Model):
             "completed": qs.filter(status=RidePassenger.Status.COMPLETED).count(),
             "rejected":  qs.filter(status=RidePassenger.Status.REJECTED).count(),
         }
+        
+        
+class RideRequest(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="rideRequest")
+    departure = models.CharField(max_length=150)
+    destination = models.CharField(max_length=150)
+    date_of_departure = models.DateTimeField(default=timezone.now)
+    budget_price = models.DecimalField(max_digits=80, decimal_places=2, default=0.00)
+    special_request = models.TextField(null=True, blank=True)
+    class PaymentMethod(models.TextChoices):
+        ONLINE = "online", "online"
+        ARRIVAL = "pay on arrival", "pay on arrival"
+        PARK = "pay in car park", "pay in car park"
+
+    payment_method = models.CharField(
+        max_length=20, choices=PaymentMethod.choices, null=True, blank=True
+    )
+    
+    def __str__(self):
+        return f"{self.user.first_name} - Ride Request: {self.departure} to {self.destination}"
+    
     
 
 class Subscription(models.Model):

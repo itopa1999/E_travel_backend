@@ -13,7 +13,7 @@ urlpatterns = [
                 path('info/', GetAllUserInfoView.as_view()),
                 path("ride/passenger/details/<str:request_ride_id>/", RidePassengerDetailAPIView.as_view()),
                 path("earning/summary/", DriverEarningSummaryAPIView.as_view()),
-                
+                path('ride/requests/', RideRequestAPIView.as_view()),
             ]
         )
     ),

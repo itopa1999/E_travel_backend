@@ -475,6 +475,7 @@ class ForgetPasswordVerificationView(generics.GenericAPIView):
 class ChangePasswordView(generics.GenericAPIView):
     swagger_schema = TaggedAutoSchema
     serializer_class = ChangePasswordSerializer
+    permission_classes = [IsAuthenticated]
     def post(self, request, *args, **kwargs):
         serializer = ChangePasswordSerializer(data=request.data)
         if serializer.is_valid():
@@ -503,85 +504,17 @@ class ChangePasswordView(generics.GenericAPIView):
 
 
 
-
-
-# class LOGECPaystackCashDepositView(generics.GenericAPIView):
-#     serializer_class = DepositSerializer
-#     swagger_schema = TaggedAutoSchema
-#     def post(self, request, *args, **kwargs):
-#         serializer = self.serializer_class(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#         title = serializer.validated_data.get('title')
-#         name = serializer.validated_data.get('name')
-#         amount = serializer.validated_data["amount"]
-#         percentage = 1.5 / 100
-#         additionalAmount = 100
-#         modifiedAmount = (amount * percentage) + amount + additionalAmount
-#         amount = int(modifiedAmount) * 100
-#         ref = secrets.token_urlsafe(15)
-#         if serializer.is_valid():
-#             url="https://api.paystack.co/transaction/initialize"
-#             headers = {
-#                     'Authorization': f'Bearer {settings.PAYSTACK_SECRET_KEY}',
-#                     'Content-Type': 'application/json',
-#                 }
-#             redirect_url = request.build_absolute_uri(reverse('paystack-confirm-deposit', kwargs={"reference":ref}))
-#             data = { 
-#             "email": "LOGEC@gmail.com", 
-#             "amount": amount,
-#             "reference":ref,
-#             "metadata":{
-#                 "name" : name,
-#                 "title":title
-#             },
-#             "callback_url": redirect_url
-#             }
-#             print(data)
-#             response = req.post(url, headers=headers, json=data)
-#             if response.status_code == 200:
-#                 response_data = response.json()
-#                 return Response(
-#                     {
-#                         "link": response_data["data"]["authorization_url"],
-#                     },
-#                     status=response.status_code,
-#                 )
-#             else:
-#                 return Response({"details":response.json()}, status=response.status_code)
-#         else:
-#                 return Response({"details":"Invalid Amount"}, status=response.status_code)
-
-
-
-
-# class LOGECPaystackConfirmDepositView(APIView):
-#     swagger_schema = TaggedAutoSchema
-#     def get(self, request,reference, *args, **kwargs):
-#         if not reference:
-#             return Response({"error": "Transaction reference required."}, status=status.HTTP_400_BAD_REQUEST)
-        
-#         verification_url = f"https://api.paystack.co/transaction/verify/{reference}"
-#         headers = {
-#             "Authorization": f"Bearer {settings.PAYSTACK_SECRET_KEY}",
-#         }
-#         response = req.get(verification_url, headers=headers)
-#         verification_data = response.json()
-#         if verification_data['status'] == True and verification_data['data']['status'] == 'success':
-#             amount = int(verification_data['data']['amount'])/100
-#             title = verification_data['data']['metadata']['title']
-#             name = verification_data['data']['metadata']['name']
-#             ref = reference
-
-#             try:
-#                 offering = LOGECDonation.objects.create(
-#                     amount = amount,
-#                     title = title,
-#                     name = name,
-#                     ref = ref
-#                 )
-#                 return Response(status=status.HTTP_204_NO_CONTENT)
-#             except:
-#                 return Response({"error": "Payment successful, but can not complete request."}, status=status.HTTP_404_NOT_FOUND)
-#         return Response({"error": "Transaction verification failed."}, status=status.HTTP_400_BAD_REQUEST)
-
-
+class GetAndSendProfileRequestView(generics.GenericAPIView):
+    swagger_schema = TaggedAutoSchema
+    serializer_class = ProfileUpdateRequestSerializer
+    
+    def get(self, request):
+        serializer = UserProfileSerializer(request.user, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def post(self, request):
+        serializer = ProfileUpdateRequestSerializer(data=request.data, context={"request": request})
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response({"message": "Update request submitted."}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

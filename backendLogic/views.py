@@ -15,8 +15,8 @@ from rest_framework.parsers import MultiPartParser, FormParser
 
 from administrator.models import IdentityInfo
 from backend.permissions import IsClientPermission, IsDriverPermission
-from backendLogic.serializers import DashboardActiveRideListSerializer, DashboardRatingListSerializer, IdVerificationSerializer, IdentityInfoSerializer, RidePassengerDetailsSerializer, RideSerializer, TransactionSerializer, VehicleInfoSerializer, WithdrawalSerializer
-from .models import DriverReview, Ride, RidePassenger, Transaction, VehicleInfo
+from backendLogic.serializers import DashboardActiveRideListSerializer, DashboardRatingListSerializer, IdVerificationSerializer, IdentityInfoSerializer, RidePassengerDetailsSerializer, RideRequestSerializer, RideSerializer, TransactionSerializer, VehicleInfoSerializer, WithdrawalSerializer
+from .models import DriverReview, Ride, RidePassenger, RideRequest, Transaction, VehicleInfo
 
 
 
@@ -255,3 +255,12 @@ class DriverEarningSummaryAPIView(APIView):
             "wallet_balance" : user.wallet.balance,
         }
         return Response(response, status=status.HTTP_200_OK)
+    
+    
+class RideRequestAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsDriverPermission]
+    def get(self, request, *args, **kwargs):
+        ride_request = RideRequest.objects.all()
+        serializer = RideRequestSerializer(ride_request, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        

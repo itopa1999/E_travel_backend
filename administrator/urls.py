@@ -15,7 +15,7 @@ urlpatterns = [
                 path("change/password/", ChangePasswordView.as_view()),
                 path('verify/email/<uidb64>/<token>/', VerifyEmailView.as_view(), name='verify-email'),
                 path('paystack/confirm-driver-sub/<str:reference>/', PaystackDriverConfirmSubscriptionView.as_view(), name='paystack-confirm-driver-sub'),
-
+                path("get-request/profile/", GetAndSendProfileRequestView.as_view()),
                 
                 
             ]

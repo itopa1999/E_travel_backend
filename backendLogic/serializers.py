@@ -1,8 +1,8 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ParseError
 
-from administrator.models import IdentityInfo
-from backendLogic.models import DriverReview, Ride, RidePassenger, Transaction, VehicleInfo
+from administrator.models import IdentityInfo, User
+from backendLogic.models import DriverReview, Ride, RidePassenger, RideRequest, Transaction, VehicleInfo
 
 
 class DashboardRatingListSerializer(serializers.ModelSerializer):
@@ -209,3 +209,35 @@ class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = ['id', 'amount', 'description', 'tran_type', 'ref', 'date']
+        
+        
+class UserSerializer(serializers.ModelSerializer):
+    profile_picture = serializers.SerializerMethodField()
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'phone', 'first_name', 'last_name', 'profile_picture']
+        
+    def get_profile_picture(self, obj):
+        request = self.context.get("request")
+        profile_pic = obj.profile_picture
+        if profile_pic and hasattr(profile_pic, "url"):
+            return request.build_absolute_uri(profile_pic.url)
+        return None
+        
+        
+class RideRequestSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    
+    class Meta:
+        model = RideRequest
+        fields = [
+            'id',
+            'user',
+            'departure',
+            'destination',
+            'date_of_departure',
+            'budget_price',
+            'special_request',
+            'payment_method',
+        ]
+        read_only_fields = ['user']

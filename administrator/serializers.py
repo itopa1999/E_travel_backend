@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ParseError
 
-from .models import User
+from .models import ProfileUpdateRequest, User
 
 
 
@@ -112,3 +112,24 @@ class ChangePasswordSerializer(serializers.Serializer):
             raise ParseError("New password must be different from the current password.")
 
         return data
+    
+    
+    
+class UserProfileSerializer(serializers.ModelSerializer):
+    profile_picture = serializers.SerializerMethodField()
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'email', 'phone', 'profile_picture']
+        
+    def get_profile_picture(self, obj):
+        request = self.context.get("request")
+        if obj.profile_picture and hasattr(obj.profile_picture, "url"):
+            return request.build_absolute_uri(obj.profile_picture.url)
+        return None
+        
+        
+
+class ProfileUpdateRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProfileUpdateRequest
+        fields = ['field', 'value', 'reason']

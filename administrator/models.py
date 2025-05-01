@@ -114,3 +114,14 @@ class Wallet(models.Model):
     
     def __str__(self):
         return f"{self.user.first_name} - wallet balance {self.balance}"
+    
+    
+    
+class ProfileUpdateRequest(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    field = models.CharField(max_length=160, null=True, blank=True)
+    value = models.CharField(max_length=160, null=True, blank=True)
+    reason = models.CharField(max_length=1600, null=True, blank=True)
+    
+    def __str__(self):
+        return f"{self.user.first_name} - wallet balance {self.balance}"
