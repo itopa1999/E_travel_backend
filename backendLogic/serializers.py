@@ -241,3 +241,59 @@ class RideRequestSerializer(serializers.ModelSerializer):
             'payment_method',
         ]
         read_only_fields = ['user']
+        
+        
+        
+# FOR CLIENT
+class AvailableRideSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    class Meta:
+        model = Ride
+        fields = ['id','departure','destination','date_of_departure','available_seat','price_per_seat',
+                  'user']
+
+class DriverVehicleInfoSerializer(serializers.ModelSerializer):
+    is_verified = serializers.SerializerMethodField()
+    ride = AvailableRideSerializer(read_only = True)
+    class Meta:
+        model = VehicleInfo
+        fields = ['id','vehicle_name','vehicle_type','seating_capacity','plate_no','vehicle_color',
+                  'ride','is_verified']
+
+    def get_is_verified(self, obj):
+        if IdentityInfo.objects.filter(user = obj.ride.user, is_verified = True):
+            return True
+        return False
+    
+    
+    
+class DashboardRideSerializer(serializers.ModelSerializer):
+    car_type = serializers.SerializerMethodField()
+    class Meta:
+        model = Ride
+        fields = ['id','departure','destination','date_of_departure','available_seat','price_per_seat',
+                  'car_type']
+        
+    def get_car_type(self, obj):
+        car_type = VehicleInfo.objects.filter(ride = obj).first()
+        return car_type.vehicle_name
+    
+    
+    
+class ClientRideRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RideRequest
+        fields = [
+            'departure',
+            'destination',
+            'date_of_departure',
+            'budget_price',
+            'special_request',
+            'payment_method',
+        ]
+    
+    def validate(self, attrs):
+        if not attrs.get('departure') or not attrs.get('destination') or not attrs.get('date_of_departure'):
+            raise serializers.ValidationError("Please provide Location, Destination, and Departure Date.")
+
+        return attrs

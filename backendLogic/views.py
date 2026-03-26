@@ -11,19 +11,22 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.parsers import MultiPartParser, FormParser
-
+from drf_yasg.utils import swagger_auto_schema
 
 from administrator.models import IdentityInfo
 from backend.permissions import IsClientPermission, IsDriverPermission
-from backendLogic.serializers import DashboardActiveRideListSerializer, DashboardRatingListSerializer, IdVerificationSerializer, IdentityInfoSerializer, RidePassengerDetailsSerializer, RideRequestSerializer, RideSerializer, TransactionSerializer, VehicleInfoSerializer, WithdrawalSerializer
+from backendLogic.serializers import ClientRideRequestSerializer, DashboardActiveRideListSerializer, DashboardRatingListSerializer, DashboardRideSerializer, DriverVehicleInfoSerializer, IdVerificationSerializer, IdentityInfoSerializer, RidePassengerDetailsSerializer, RideRequestSerializer, RideSerializer, TransactionSerializer, VehicleInfoSerializer, WithdrawalSerializer
 from .models import DriverReview, Ride, RidePassenger, RideRequest, Transaction, VehicleInfo
 
 
 
 # Create your views here.
 
+
+# FOR DRIVER
 class DashboardView(APIView):
     permission_classes = [IsAuthenticated, IsDriverPermission]
+    @swagger_auto_schema(tags=["Driver"])
     def get(self, request, *args, **kwargs):
         user = self.request.user
         summary = Transaction.get_earnings(user)
@@ -60,6 +63,7 @@ class DashboardView(APIView):
 
 class UpdateAvailabilityView(APIView):
     permission_classes = [IsAuthenticated, IsDriverPermission]
+    @swagger_auto_schema(tags=["Driver"])
     def post(self, request, *args, **kwargs):
         user = request.user
         user.is_available = not user.is_available
@@ -70,6 +74,7 @@ class UpdateAvailabilityView(APIView):
 class WithdrawalProcessView(generics.GenericAPIView):
     serializer_class = WithdrawalSerializer
     permission_classes = [IsAuthenticated, IsDriverPermission]
+    @swagger_auto_schema(tags=["Driver"])
     def post(self, request, *args, **kwargs):
         serializer = WithdrawalSerializer(data=request.data, context={'request': request})
         
@@ -127,7 +132,7 @@ class IdVerificationView(generics.GenericAPIView):
     serializer_class = IdVerificationSerializer
     permission_classes = [IsAuthenticated, IsDriverPermission]
     parser_classes = [MultiPartParser, FormParser]
-
+    @swagger_auto_schema(tags=["Driver"])
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={'request': request})
         
@@ -158,7 +163,7 @@ class IdVerificationView(generics.GenericAPIView):
     
 class GetAllUserInfoView(APIView):
     permission_classes = [IsAuthenticated, IsDriverPermission]
-
+    @swagger_auto_schema(tags=["Driver"])
     def get(self, request):
         user = request.user
         data = {}
@@ -193,6 +198,7 @@ class GetAllUserInfoView(APIView):
     
 class RidePassengerDetailAPIView(APIView):
     permission_classes = [IsAuthenticated, IsDriverPermission]
+    @swagger_auto_schema(tags=["Driver"])
     def get(self, request, request_ride_id, *args, **kwargs):
 
         try:
@@ -202,7 +208,7 @@ class RidePassengerDetailAPIView(APIView):
         serializer = RidePassengerDetailsSerializer(ride, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
         
-        
+    @swagger_auto_schema(tags=["Driver"]) 
     def patch(self, request, request_ride_id, *args, **kwargs):
         try:
             passenger = RidePassenger.objects.get(
@@ -242,6 +248,7 @@ class RidePassengerDetailAPIView(APIView):
     
 class DriverEarningSummaryAPIView(APIView):
     permission_classes = [IsAuthenticated, IsDriverPermission]
+    @swagger_auto_schema(tags=["Driver"])
     def get(self, request, *args, **kwargs):
         user = self.request.user
         summary = Transaction.get_earnings(user)
@@ -259,8 +266,68 @@ class DriverEarningSummaryAPIView(APIView):
     
 class RideRequestAPIView(APIView):
     permission_classes = [IsAuthenticated, IsDriverPermission]
+    @swagger_auto_schema(tags=["Driver"])
     def get(self, request, *args, **kwargs):
         ride_request = RideRequest.objects.all()
         serializer = RideRequestSerializer(ride_request, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
+      
+      
+      
         
+#  FOR CLIENT
+class ClientDashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+    @swagger_auto_schema(tags=["Client"])
+    def get(self, request, *args, **kwargs):
+        user = self.request.user
+        rides = Ride.objects.all()
+        rides_serializer = DashboardRideSerializer(rides, many=True).data
+        
+        response = {
+            "rides":rides_serializer,
+        }
+        
+        return Response(response, status=status.HTTP_200_OK)
+    
+    
+class RideRequestView(APIView):
+    permission_classes = [IsAuthenticated]
+    @swagger_auto_schema(tags=["Client"])
+    def get(self, request, *args, **kwargs):
+        car_types = RideRequest.objects.filter(user = request.user)
+        
+        response = {
+            "vehicle_types": list(car_types)
+        }
+        
+        return Response(response, status=status.HTTP_200_OK)
+    
+    
+    
+        
+class CarTypeListView(APIView):
+    permission_classes = [IsAuthenticated]
+    @swagger_auto_schema(tags=["Client"])
+    def get(self, request, *args, **kwargs):
+        car_types = VehicleInfo.objects.values_list("vehicle_name", flat=True)
+        
+        response = {
+            "vehicle_types": list(car_types)
+        }
+        
+        return Response(response, status=status.HTTP_200_OK)
+    
+    
+    
+class RideRequestCreateView(generics.CreateAPIView):
+    queryset = RideRequest.objects.all()
+    serializer_class = ClientRideRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        print("✅ Received data from frontend:", request.data)
+        return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
